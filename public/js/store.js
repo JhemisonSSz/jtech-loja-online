@@ -291,13 +291,91 @@ document.addEventListener("DOMContentLoaded", async () => {
         <h2>${esc(p.nome)}</h2>
         <div class="precos">${p.precoAntigo > p.preco ? `<s>${moeda(p.precoAntigo)}</s>` : ""}<strong>${moeda(p.preco)}</strong></div>
         <p>${esc(p.descricao || "")}</p>
-        ${temVariantes(p) ? `<div class="variantes" role="radiogroup" aria-label="Opções">${p.variantes.map((v) => `
+        ${DB.ehGrade(p) ? `<div id="grade-escolha"></div>` : temVariantes(p) ? `<div class="variantes" role="radiogroup" aria-label="Opções">${p.variantes.map((v) => `
           <label class="var ${v.estoque <= 0 ? "off" : ""}"><input type="radio" name="vid" value="${esc(v.id)}" ${v.estoque <= 0 ? "disabled" : ""} /><span>${esc(v.nome)}</span></label>`).join("")}</div>` : ""}
         <p class="estoque ${esgotado ? "zero" : ""}">${esgotado ? "Esgotado" : p.estoque <= 5 ? `Restam apenas ${p.estoque}` : "Em estoque"}</p>
         <button class="btn-principal" data-add="${p.id}" ${esgotado ? "disabled" : ""}>Adicionar ao carrinho</button>
       </div>`;
     $("#modal-produto").hidden = false;
+    escolha = null;
+    if (DB.ehGrade(p)) {
+      escolha = { p, tamanho: "", cor: "" };
+      renderEscolha();
+      // as fotos das cores só são baixadas agora, quando o cliente abre o produto
+      if (!fotosCache[p.id]) {
+        DB.fotosCores.obter(p.id)
+          .then((f) => { fotosCache[p.id] = f; })
+          .catch(() => { fotosCache[p.id] = {}; })
+          .finally(() => { if (escolha && escolha.p.id === p.id) renderEscolha(); });
+      }
+    }
   };
+
+  // ---- Escolha de tamanho e cor (produto "em grade", ver DB.ehGrade em db.js) ----
+  // O cliente escolhe o tamanho; aparecem as cores que existem nesse tamanho (esgotadas riscadas);
+  // ao escolher a cor, a foto do produto muda para a foto daquela cor.
+  const fotosCache = {}; // id do produto → { idDaCor: imagem }
+  let escolha = null; // { p, tamanho, cor } do produto aberto
+  const hexCor = (h) => (/^#[0-9a-f]{6}$/i.test(h || "") ? h : "#cccccc");
+  const varianteEscolhida = () => {
+    if (!escolha) return null;
+    const { p, tamanho, cor } = escolha;
+    if (((p.tamanhos || []).length && !tamanho) || ((p.cores || []).length && !cor)) return null;
+    return p.variantes.find((v) => (v.tamanho || "") === tamanho && (v.cor || "") === cor) || null;
+  };
+  const renderEscolha = () => {
+    const { p, tamanho, cor } = escolha;
+    const caixa = $("#grade-escolha");
+    if (!caixa) return;
+    // só mostra tamanhos e cores que existem em alguma combinação cadastrada
+    const tamanhos = (p.tamanhos || []).filter((t) => p.variantes.some((v) => v.tamanho === t));
+    const doTamanho = p.variantes.filter((v) => !tamanhos.length || v.tamanho === tamanho);
+    const cores = (p.cores || []).filter((c) => doTamanho.some((v) => v.cor === c.id));
+    const corAtual = cores.find((c) => c.id === cor);
+    let html = "";
+    if (tamanhos.length) {
+      html += `<p class="esc-rot">Tamanho${tamanho ? `: <b>${esc(tamanho)}</b>` : ""}</p>
+        <div class="variantes" role="radiogroup" aria-label="Tamanho">${tamanhos.map((t) => {
+          const qtd = p.variantes.filter((v) => v.tamanho === t).reduce((s, v) => s + v.estoque, 0);
+          return `<label class="var ${qtd <= 0 ? "off" : ""}"><input type="radio" name="tam" value="${esc(t)}" ${t === tamanho ? "checked" : ""} ${qtd <= 0 ? "disabled" : ""} /><span>${esc(t)}</span></label>`;
+        }).join("")}</div>`;
+    }
+    if ((p.cores || []).length) {
+      if (tamanhos.length && !tamanho) html += `<p class="esc-dica">Escolha um tamanho para ver as cores</p>`;
+      else {
+        html += `<p class="esc-rot">Cor${corAtual ? `: <b>${esc(corAtual.nome)}</b>` : ""}</p>
+          <div class="cores-op" role="radiogroup" aria-label="Cor">${cores.map((c) => {
+            const off = doTamanho.find((v) => v.cor === c.id).estoque <= 0;
+            return `<label class="cor-op ${off ? "off" : ""}" title="${esc(c.nome)}${off ? " (esgotada)" : ""}"><input type="radio" name="cor" value="${esc(c.id)}" ${c.id === cor ? "checked" : ""} ${off ? "disabled" : ""} /><span class="bola" style="background:${hexCor(c.hex)}"></span><small>${esc(c.nome)}</small></label>`;
+          }).join("")}</div>`;
+      }
+    }
+    caixa.innerHTML = html;
+    // botão, aviso de estoque e foto acompanham a escolha
+    const v = varianteEscolhida();
+    const btn = $("#produto-detalhe [data-add]");
+    if (p.estoque > 0) {
+      btn.disabled = !v || v.estoque <= 0;
+      btn.textContent = v ? "Adicionar ao carrinho" : tamanhos.length && !tamanho ? "Escolha o tamanho" : "Escolha a cor";
+      const aviso = $("#produto-detalhe .estoque");
+      if (v) aviso.textContent = v.estoque <= 5 ? `Restam apenas ${v.estoque}` : "Em estoque";
+    }
+    const foto = cor && fotosCache[p.id] && fotosCache[p.id][cor];
+    $("#produto-detalhe img").src = foto || imagemProduto(p);
+  };
+  $("#produto-detalhe").addEventListener("change", (e) => {
+    if (!escolha) return;
+    if (e.target.name === "tam") {
+      escolha.tamanho = e.target.value;
+      // se a cor escolhida não existe (ou acabou) no novo tamanho, limpa a cor
+      const v = escolha.p.variantes.find((x) => x.tamanho === escolha.tamanho && x.cor === escolha.cor);
+      if (!v || v.estoque <= 0) escolha.cor = "";
+      renderEscolha();
+    } else if (e.target.name === "cor") {
+      escolha.cor = e.target.value;
+      renderEscolha();
+    }
+  });
 
   // ---- Navegação entre Início e Produtos (usa o # da URL) ----
   const rotear = () => {
@@ -450,6 +528,12 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (!p) return;
       if (!temVariantes(p)) return adicionar(p.id);
       if (!add.closest("#produto-detalhe")) return abrirProduto(p.id);
+      if (DB.ehGrade(p)) {
+        const v = varianteEscolhida();
+        if (!v) return toast("Escolha o tamanho e a cor");
+        adicionar(p.id, v.id);
+        return;
+      }
       const sel = document.querySelector('#produto-detalhe input[name="vid"]:checked');
       if (!sel) return toast("Escolha uma opção");
       adicionar(p.id, sel.value);

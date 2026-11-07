@@ -1,8 +1,8 @@
 // Service worker: rede primeiro, com cache de reserva do casco do app (e requisito para instalar como PWA).
 // Requisições ao Firebase (outros domínios) nunca passam pelo cache.
-const VERSAO = "loja-v20";
+const VERSAO = "loja-v21";
 const BASE = [
-  "./", "index.html", "acompanhar.html", "css/style.css?v=17", "css/splash.css", "icons/logo-jtech.png", "icons/jtech-192.png",
+  "./", "index.html", "acompanhar.html", "css/style.css?v=18", "css/splash.css", "icons/logo-jtech.png", "icons/jtech-192.png",
   "js/db.js", "js/store.js", "js/acompanhar.js", "js/pwa.js", "js/splash.js",
   "firebase-config.js", "manifest.webmanifest", "icons/icon-192.png",
 ];

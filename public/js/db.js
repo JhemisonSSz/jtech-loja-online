@@ -260,6 +260,34 @@
   produtos.definirEstoque = (id, novo, vid, info = {}) => gravarEstoque(id, () => novo, vid, info);
   // Atualiza só alguns campos (não sobrescreve o resto do produto)
   produtos.atualizarCampos = (id, campos) => fs.collection("produtos").doc(id).update(limpar(campos));
+
+  // ---- Tamanhos e cores ----
+  // Produto "em grade": tem a lista `tamanhos` (ex.: ["P","M"]) e/ou `cores` ([{ id, nome, hex }]).
+  // Cada combinação que existe vira uma variante { id, nome: "M - Preta", tamanho: "M", cor: "c1", estoque }.
+  // Assim carrinho, pedido, PDV e estoque continuam usando `variante.nome` como antes.
+  const ehGrade = (p) => !!p && ((Array.isArray(p.tamanhos) && p.tamanhos.length > 0) || (Array.isArray(p.cores) && p.cores.length > 0));
+  const nomeVariante = (tamanho, corNome) => [tamanho, corNome].filter(Boolean).join(" - ");
+
+  // As fotos de cada cor ficam num documento separado: fotosCores/{id do produto} = { idDaCor: imagem }.
+  // Motivo: a loja baixa todos os produtos ao abrir; com as fotos das cores junto, ficaria pesada.
+  // Aqui elas só são baixadas quando o cliente abre aquele produto.
+  const fotosCores = {
+    async obter(produtoId) {
+      const d = await fs.collection("fotosCores").doc(produtoId).get();
+      return d.exists ? d.data() : {};
+    },
+    async salvar(produtoId, fotos) {
+      if (Object.keys(fotos).length) await fs.collection("fotosCores").doc(produtoId).set(limpar(fotos));
+      else await fs.collection("fotosCores").doc(produtoId).delete();
+    },
+  };
+  // Ao excluir um produto, apaga também as fotos das cores dele
+  const removerProduto = produtos.remover;
+  produtos.remover = async (id) => {
+    await removerProduto(id);
+    try { await fs.collection("fotosCores").doc(id).delete(); } catch { /* sem fotos: nada a apagar */ }
+  };
+
   const movimentos = colecao("movimentos");
   // Registro avulso (ex.: estoque inicial no cadastro ou alteração pelo formulário do produto)
   movimentos.registrar = (produto, vid, antes, depois, info = {}) => (antes === depois ? Promise.resolve() : movimentos.salvar(limpar(movimentoDe(produto, produto.id, vid, antes, depois, info))));
@@ -371,6 +399,9 @@
     fs,
     auth,
     produtos,
+    fotosCores,
+    ehGrade,
+    nomeVariante,
     categorias: colecao("categorias"),
     cupons: colecao("cupons"),
     pedidos,

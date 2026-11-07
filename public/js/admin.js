@@ -463,6 +463,12 @@ document.addEventListener("DOMContentLoaded", () => {
     const p = id ? await DB.produtos.obter(id) : { nome: "", categoria: "", preco: "", precoAntigo: "", estoque: 0, descricao: "", imagem: "", destaque: false, ativo: true };
     const cats = await DB.categorias.listar();
     let imagem = p.imagem;
+    // Produto com variações digitadas no formato antigo ("M - Azul") continua no editor antigo,
+    // até o admin clicar em "Usar tamanhos e cores". Os demais usam o editor de tamanhos e cores.
+    let modoAntigo = (p.variantes || []).length > 0 && !DB.ehGrade(p);
+    let grade = null;
+    let fotosCores = {};
+    if (id && DB.ehGrade(p)) { try { fotosCores = await DB.fotosCores.obter(id); } catch { /* sem fotos */ } }
     abrirModal(id ? "Editar produto" : "Novo produto", `
       <label>Nome<input name="nome" value="${esc(p.nome)}" required /></label>
       <div class="grid2">
@@ -479,9 +485,15 @@ document.addEventListener("DOMContentLoaded", () => {
         <label>Estoque mínimo (alerta)<input name="estoqueMinimo" type="number" min="0" step="1" value="${p.estoqueMinimo ?? ""}" placeholder="padrão" /></label>
       </div>
       <div class="vars-box">
-        <div class="vars-cab"><b>Variações (tamanho, cor...)</b><button type="button" class="btn sec peq" id="add-var"><i class="fa-solid fa-plus"></i> Adicionar</button></div>
-        <p class="dica">Opcional. Cada variação tem estoque próprio e pode ter seu SKU / código de barras (ex.: "M - Azul"). Com variações, o estoque total é a soma delas.</p>
-        <div id="vars-lista"></div>
+        <div class="vars-cab"><b>Tamanhos e cores</b></div>
+        <p class="dica">Opcional. Cada combinação tem estoque próprio; o estoque total vira a soma delas.</p>
+        <div id="grade-box"></div>
+        <div id="vars-antigo" hidden>
+          <div class="vars-cab"><b>Variações (formato antigo)</b><button type="button" class="btn sec peq" id="add-var"><i class="fa-solid fa-plus"></i> Adicionar</button></div>
+          <p class="dica">Este produto usa variações digitadas (ex.: "M - Azul"). Para ter bolinhas de cor e foto por cor, troque para tamanhos e cores.</p>
+          <div id="vars-lista"></div>
+          <button type="button" class="btn sec peq" id="usar-grade"><i class="fa-solid fa-palette"></i> Usar tamanhos e cores</button>
+        </div>
       </div>
       <label>Descrição<textarea name="descricao" rows="3">${esc(p.descricao)}</textarea></label>
       <label>Imagem (envie um arquivo ou cole uma URL)
@@ -493,17 +505,31 @@ document.addEventListener("DOMContentLoaded", () => {
       <label class="check"><input type="checkbox" name="ativo" ${p.ativo !== false ? "checked" : ""} /> Visível na loja</label>`,
       async (d) => {
         const url = d.imagemUrl.trim();
-        const variantes = [...document.querySelectorAll("#vars-lista .var-linha")]
-          .map((l) => ({ id: l.dataset.id, nome: l.querySelector(".v-nome").value.trim(), codigo: l.querySelector(".v-cod").value.trim(), estoque: Math.max(0, parseInt(l.querySelector(".v-est").value, 10) || 0) }))
-          .filter((v) => v.nome);
-        if (new Set(variantes.map((v) => v.nome.toLowerCase())).size !== variantes.length) { toast("Há variações com o mesmo nome"); return false; }
+        let variantes, tamanhosCores, fotosParaSalvar = null;
+        if (modoAntigo) {
+          variantes = [...document.querySelectorAll("#vars-lista .var-linha")]
+            .map((l) => ({ id: l.dataset.id, nome: l.querySelector(".v-nome").value.trim(), codigo: l.querySelector(".v-cod").value.trim(), estoque: Math.max(0, parseInt(l.querySelector(".v-est").value, 10) || 0) }))
+            .filter((v) => v.nome);
+          if (new Set(variantes.map((v) => v.nome.toLowerCase())).size !== variantes.length) { toast("Há variações com o mesmo nome"); return false; }
+          tamanhosCores = { tamanhos: [], cores: [] };
+        } else {
+          const g = grade.ler();
+          if (g.erro) { toast(g.erro); return false; }
+          variantes = g.variantes;
+          tamanhosCores = { tamanhos: g.tamanhos, cores: g.cores };
+          fotosParaSalvar = g.fotos;
+        }
         const item = {
-          ...p, nome: d.nome.trim(), categoria: d.categoria, preco: parseFloat(d.preco), precoAntigo: parseFloat(d.precoAntigo) || 0,
+          ...p, ...tamanhosCores, nome: d.nome.trim(), categoria: d.categoria, preco: parseFloat(d.preco), precoAntigo: parseFloat(d.precoAntigo) || 0,
           estoque: variantes.length ? variantes.reduce((t, v) => t + v.estoque, 0) : parseInt(d.estoque, 10), variantes, estoqueMinimo: d.estoqueMinimo === "" ? null : Math.max(0, parseInt(d.estoqueMinimo, 10) || 0), codigo: d.codigo.trim(), custo: d.custo === "" ? null : parseFloat(d.custo), descricao: d.descricao.trim(), imagem: url || imagem || DB.placeholder("📦", "#e5e7eb"),
           destaque: d.destaque === "on", ativo: d.ativo === "on",
         };
         let salvo = null;
         if (!(await tentar(async () => { salvo = await DB.produtos.salvar(item); }, "Falha ao salvar (imagem muito grande?)"))) return false;
+        // fotos das cores (documento separado; ver DB.fotosCores)
+        if (fotosParaSalvar && (Object.keys(fotosParaSalvar).length || Object.keys(fotosCores).length)) {
+          await tentar(() => DB.fotosCores.salvar(salvo.id, fotosParaSalvar), "Produto salvo, mas falhou ao salvar as fotos das cores");
+        }
         // histórico de estoque: estoque inicial no cadastro ou alteração feita pelo formulário
         await tentar(() => DB.movimentos.registrar(salvo, "", id ? (p.estoque || 0) : 0, salvo.estoque, { tipo: id ? "ajuste" : "entrada", motivo: id ? "Edição do produto" : "Estoque inicial (cadastro)" }));
         abrirTab("produtos"); toast("Produto salvo");
@@ -530,9 +556,26 @@ document.addEventListener("DOMContentLoaded", () => {
       l.querySelector(".rem-var").onclick = () => { l.remove(); somar(); };
       lista.appendChild(l);
     };
-    (p.variantes || []).forEach(linhaVar);
-    somar();
     $("#add-var").onclick = () => { linhaVar(); somar(); lista.lastChild.querySelector(".v-nome").focus(); };
+    // editor de tamanhos e cores (js/admin-grade.js)
+    const montarGrade = () => {
+      grade = window.AdminGrade.montar($("#grade-box"), modoAntigo ? { ...p, variantes: [] } : p, fotosCores, {
+        lerImagem, toast,
+        aoMudarTotal: (total, temVariantes) => { campoEst.readOnly = temVariantes; if (temVariantes) campoEst.value = total; },
+      });
+    };
+    if (modoAntigo) {
+      $("#vars-antigo").hidden = false;
+      (p.variantes || []).forEach(linhaVar);
+      somar();
+      $("#usar-grade").onclick = () => {
+        if (!confirm("Trocar para tamanhos e cores? As variações atuais saem e você preenche o estoque de novo na tabela (só vale depois de clicar em Salvar).")) return;
+        lista.innerHTML = "";
+        $("#vars-antigo").hidden = true;
+        modoAntigo = false;
+        montarGrade();
+      };
+    } else montarGrade();
     $("#scan-codigo").onclick = () => {
       if (!window.Admin.scanner.suportado()) return toast("Este navegador não permite usar a câmera. Digite o código ou use um leitor USB.");
       window.Admin.scanner.abrir({

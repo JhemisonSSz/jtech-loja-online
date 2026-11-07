@@ -24,6 +24,12 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // Fotos de cada cor do produto (um documento por produto)
+    match /fotosCores/{doc} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /cupons/{doc} {
       allow read: if true;
       allow write: if isAdmin();

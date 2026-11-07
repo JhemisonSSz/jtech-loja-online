@@ -134,6 +134,22 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--primaria); 
 .var input:checked + span { background: var(--primaria); border-color: var(--primaria); color: var(--on-primaria); }
 .var input:focus-visible + span { outline: 2px solid var(--primaria); outline-offset: 2px; }
 .var.off span { opacity: .4; text-decoration: line-through; cursor: not-allowed; }
+
+/* Escolha de tamanho e cor (store.js → renderEscolha) */
+#grade-escolha { display: grid; gap: 8px; }
+.esc-rot { font-size: .85rem; color: var(--suave); }
+.esc-rot b { color: var(--texto); }
+.esc-dica { font-size: .85rem; color: var(--suave); font-style: italic; }
+.cores-op { display: flex; flex-wrap: wrap; gap: 12px; }
+.cor-op { position: relative; display: grid; justify-items: center; gap: 4px; cursor: pointer; min-width: 44px; }
+.cor-op input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.cor-op .bola { position: relative; width: 32px; height: 32px; border-radius: 50%; border: 2px solid var(--bg); box-shadow: 0 0 0 1px var(--borda); }
+.cor-op small { font-size: .75rem; }
+.cor-op input:checked + .bola { box-shadow: 0 0 0 2px var(--primaria); }
+.cor-op input:focus-visible + .bola { outline: 2px solid var(--primaria); outline-offset: 3px; }
+.cor-op.off { opacity: .45; cursor: not-allowed; }
+.cor-op.off small { text-decoration: line-through; }
+.cor-op.off .bola::after { content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: 2px; background: var(--erro); transform: rotate(-45deg); }
 .estoque.zero { color: var(--erro); }
 .ci-var { color: var(--suave); font-size: .8rem; }
 

@@ -31,7 +31,7 @@ Tem duas páginas, trocadas pelo menu do topo (que rola na horizontal no celular
 Recursos:
 - Catálogo com busca, filtro por categoria e ordenação (destaques, preço, nome).
 - Selo de desconto (preço antigo × preço atual) e aviso de esgotado.
-- Janela de detalhes do produto, com escolha de **variações** (tamanho, cor etc.) quando existirem.
+- Janela de detalhes do produto. Com **tamanhos e cores**, o cliente escolhe o tamanho, depois aparecem só as cores daquele tamanho (esgotadas riscadas) e a **foto muda para a cor escolhida**.
 - Carrinho lateral salvo no navegador, respeitando o estoque de cada produto/variação.
 - Compra em **3 etapas** dentro do carrinho, com indicador de progresso e botões Voltar/Continuar:
   1. **Produtos**: revisar itens e quantidades.
@@ -51,7 +51,7 @@ Recursos:
 - **Menu lateral**: no computador fica à esquerda com os nomes; no celular vira uma faixa estreita à esquerda só com ícones, e o botão ☰ no topo da faixa abre o menu completo (toque fora, em Esc ou em um item para fechar).
 - **Dashboard**: receita total e do dia, número de pedidos, ticket médio, gráfico de vendas por dia (7/30/90 dias), mais vendidos e estoque baixo.
 - **Pedidos**: lista com filtro por status, detalhes, mudança de status, impressão/PDF e botão para avisar o cliente pelo WhatsApp.
-- **Produtos**: cadastro com foto (envio ou URL), preço, preço antigo, estoque, destaque, ocultar da loja e variações com estoque próprio.
+- **Produtos**: cadastro com foto (envio ou URL), preço, preço antigo, estoque, destaque, ocultar da loja e **tamanhos e cores** (com bolinha de cor, foto por cor e estoque de cada combinação).
 - **Estoque**: painel com indicadores e gráficos, lista completa com ajustes (entrada, saída e correção), contagem de inventário, alerta de estoque mínimo e histórico de todas as movimentações, com exportação para **Excel**, **PDF** e CSV.
 - **PDV (frente de caixa)**: venda no balcão com busca/código de barras, desconto, vários pagamentos na mesma venda (dinheiro com troco, PIX, débito, crédito e **a prazo** com parcelas que viram contas a receber), cadastro rápido de cliente e de produto sem sair da venda, cupom para imprimir, vendas do dia com cancelamento e **controle de caixa** (abertura, sangria, suprimento e fechamento com conferência).
 - **Clientes**: cadastro com telefone, CPF/CNPJ, e-mail e endereço, e o quanto cada um tem em aberto.
@@ -85,6 +85,7 @@ jtech-loja-online/
     │   ├── store.js            Lógica da loja
     │   ├── acompanhar.js       Lógica da página de acompanhamento
     │   ├── admin.js            Painel administrativo (login, dashboard, pedidos, produtos, fretes, cupons, config)
+    │   ├── admin-grade.js      Editor de tamanhos e cores do produto (tabela de estoque e foto por cor)
     │   ├── admin-config.js     Configurações do site (aparência, página inicial, entrega, cadastro, pagamento, textos)
     │   ├── admin-estoque.js    Estoque: painel, ajustes, contagem, movimentações e exportação
     │   ├── admin-clientes.js   Cadastro de clientes (também usado pelo PDV)
@@ -159,7 +160,14 @@ Menu **PDV**, com três sub-abas:
 - Além dos campos básicos, há **SKU / código de barras** (usado na busca e na câmera do PDV; ao lado do campo há um botão de câmera para preenchê-lo lendo o código, e o sistema avisa se o código já pertence a outro produto), **estoque mínimo** e **custo** (usado no lucro dos relatórios).
 - Cada **variação** pode ter o seu próprio **SKU / código de barras** (ex.: cada tamanho com um código diferente). No PDV, ler o código da variação adiciona exatamente aquela variação.
 - Foto: envie um arquivo (é reduzida automaticamente para 600 px e guardada no próprio documento) ou cole uma URL de imagem.
-- **Variações:** clique em *Adicionar* e informe nome e estoque (ex.: `M - Azul`, `40`). Com variações, o estoque total é a soma delas e a loja exige que o cliente escolha uma opção.
+- **Tamanhos e cores** (caixa no formulário do produto, código em `js/admin-grade.js`):
+  1. **Tamanhos:** digite e aperte Enter, ou use um atalho (`P M G GG`, `PP ao XG`, `36 ao 46`, `Único`).
+  2. **Cores:** *Adicionar cor* → nome, clique na bolinha para escolher a cor e no quadrado para enviar a **foto daquela cor** (sem foto, a loja usa a foto principal).
+  3. **Estoque de cada combinação:** a tabela tamanho × cor se monta sozinha. **Vazio (—)** = você não vende aquela combinação (não aparece na loja). **0** = esgotada (aparece riscada).
+  - Pode usar só tamanhos ou só cores. O estoque total é a soma da tabela. *Mostrar códigos* abre um SKU por combinação.
+  - Para o resto do sistema (carrinho, pedido, PDV, estoque) cada combinação é uma variação com nome `M - Preta`.
+  - Produtos antigos com variações digitadas (`M - Azul`) continuam funcionando; ao editar, o botão **Usar tamanhos e cores** troca para o formato novo (o estoque é preenchido de novo na tabela).
+  - As fotos das cores ficam na coleção `fotosCores` do Firestore (um documento por produto, limite de ~900 KB de fotos por produto) e só são baixadas quando o cliente abre o produto.
 - *Visível na loja* desmarcado oculta o produto sem excluí-lo.
 
 ### Estoque
@@ -243,7 +251,7 @@ Este painel substitui o antigo "Conta e dados". A troca de senha continua dispon
 
 ## 4. Como o cliente compra e acompanha
 
-1. Navega pelo catálogo, escolhe variações quando houver e adiciona ao carrinho.
+1. Navega pelo catálogo, escolhe tamanho e cor (ou a variação) quando houver e adiciona ao carrinho.
 2. Abre o carrinho e segue as 3 etapas: **Produtos** → **Entrega ou retirada** (dados e endereço, ou data e hora) → **Pagamento** (forma de pagamento, cupom opcional e conferência do total). No fim, clica em **Finalizar pedido**.
 3. Recebe uma tela com o **código do pedido** e dois botões: *Acompanhar pedido* e *Enviar pedido pelo WhatsApp*.
 4. Em qualquer momento, acessa **Acompanhar pedido** (link no topo e no rodapé) e informa o código.
@@ -268,7 +276,7 @@ O pedido é salvo no Firebase mesmo que o cliente não envie a mensagem pelo Wha
 - Não há pagamento online integrado: o pagamento é combinado com o cliente (PIX, cartão na entrega etc.).
 - O estoque só é baixado na confirmação do pedido, então dois clientes podem comprar a última unidade ao mesmo tempo antes de você confirmar. A loja revalida o estoque no momento de enviar o pedido para reduzir isso.
 - Imagens ficam dentro do documento do produto (limite de 1 MB). Para muitas fotos grandes, considere o Firebase Storage.
-- Um produto com variações tem uma única foto e um único preço para todas as variações.
+- Um produto com variações tem um único preço para todas elas. Fotos diferentes só por **cor** (não por tamanho).
 - O PDV, o caixa e o financeiro são **ferramentas de controle interno**: não emitem nota fiscal/cupom fiscal, não integram máquina de cartão e não conciliam com o banco. O cupom impresso é um comprovante simples.
 - A impressão direta usa Web Bluetooth/Web Serial, que só existem no Chrome e no Edge, em endereço seguro (https ou localhost). Cada modelo de impressora térmica tem pequenas diferenças; se o teste sair errado, use a impressão pelo navegador.
 - Os relatórios carregam as contas, produtos e as vendas do período a cada abertura. Para lojas com muito movimento, isso consome leituras do plano gratuito do Firebase (50 mil por dia); abra o relatório com períodos menores se necessário.
