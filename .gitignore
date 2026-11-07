@@ -1,0 +1,11 @@
+# Cache e logs do Firebase (gerados sozinhos, não vão para o Git)
+.firebase/
+firebase-debug*.log
+*.log
+
+# Arquivos do sistema e do editor
+.vscode/
+.DS_Store
+Thumbs.db
+*.tmp
+node_modules/
