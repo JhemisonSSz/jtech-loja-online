@@ -287,14 +287,16 @@ Todo o projeto fica numa pasta só: `C:\Users\Jhemisonssz\Projetos\jtech\jtech-l
 3. **Salve no Git:** aba *Source Control* (ícone de ramificação) → escreva o que mudou (ex.: `corrige botão do carrinho`) → **Commit** → **Sync/Push**.
 4. **Publique:** no terminal do VS Code, dentro da pasta do projeto:
    ```
-   firebase deploy
+   firebase deploy --project jtech-loja-online
    ```
    Isso envia a pasta `public/` para o site **e** as regras do `firestore.rules` para o banco.
-   Só o site: `firebase deploy --only hosting`. Só as regras: `firebase deploy --only firestore:rules`.
+   Só o site: `firebase deploy --project jtech-loja-online --only hosting`. Só as regras: `firebase deploy --project jtech-loja-online --only firestore:rules`.
+
+   **Sempre use `--project jtech-loja-online`.** Sem ele, o Firebase pode usar um "projeto ativo" salvo em outra pasta e publicar no site errado.
 
 **Regra de ouro:** só rode `firebase deploy` depois de fazer o commit. Assim, o que está no ar sempre tem uma versão salva no Git.
 
-**Quem é administrador:** os e-mails ficam na função `emailsAdmin()` do `firestore.rules`. Para dar acesso a alguém: crie o usuário no Console do Firebase (*Authentication → Users → Add user*), coloque o e-mail na lista e rode `firebase deploy --only firestore:rules`.
+**Quem é administrador:** os e-mails ficam na função `emailsAdmin()` do `firestore.rules`. Para dar acesso a alguém: crie o usuário no Console do Firebase (*Authentication → Users → Add user*), coloque o e-mail na lista e rode `firebase deploy --project jtech-loja-online --only firestore:rules`.
 
 **Mudou o `sw.js` ou algum arquivo da lista `BASE` dele?** Aumente o número em `const VERSAO = "loja-vNN"`, senão quem instalou o app pode continuar vendo a versão antiga.
 
