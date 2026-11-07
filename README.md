@@ -6,6 +6,8 @@ Sistema completo de loja virtual feito com HTML, CSS e JavaScript puro, usando o
 - **Painel administrativo** para o dono: dashboard, pedidos, produtos, categorias, fretes, cupons e configurações.
 - **PWA**: a loja pode ser instalada no celular como aplicativo.
 
+> Quer entender o caminho dos dados (produto → carrinho → pedido → estoque)? Leia o [COMO-FUNCIONA.md](COMO-FUNCIONA.md).
+
 ---
 
 ## Sumário
