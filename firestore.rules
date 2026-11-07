@@ -4,9 +4,8 @@ service cloud.firestore {
 
     // E-mails com acesso de administrador (cadastre o mesmo e-mail em Authentication → Users).
     // Use e-mails de domínio inexistente (ex.: .teste): assim ninguém recebe o link de "Esqueci a senha".
-    // TEMPORÁRIO: jtech@gmail.com sai depois que o teste@jtech.teste for testado.
     function emailsAdmin() {
-      return ['teste@jtech.teste', 'jtech@gmail.com'];
+      return ['teste@jtech.teste'];
     }
 
     function isAdmin() {
